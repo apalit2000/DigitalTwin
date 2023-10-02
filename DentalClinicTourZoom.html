@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+        <title>Tour 360</title>
+
+        <style>
+            html, body {
+                overflow: hidden;
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+
+            #renderCanvas {
+                width: 100%;
+                height: 100%;
+                touch-action: none;
+            }
+        </style>
+	<script src="https://cdn.babylonjs.com/babylon.max.js"></script>
+        <script src="https://preview.babylonjs.com/babylon.js"></script>
+        <script src="https://preview.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+        <script src="https://code.jquery.com/pep/0.4.3/pep.js"></script>
+	<script src="https://preview.babylonjs.com/gui/babylon.gui.js"></script>
+	
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.6.2/dat.gui.min.js"></script>
+        <script src="https://preview.babylonjs.com/ammo.js"></script>
+        <script src="https://preview.babylonjs.com/cannon.js"></script>
+        <script src="https://preview.babylonjs.com/Oimo.js"></script>
+        <script src="https://preview.babylonjs.com/libktx.js"></script>
+        <script src="https://preview.babylonjs.com/earcut.min.js"></script>
+       
+        <script src="https://preview.babylonjs.com/inspector/babylon.inspector.bundle.js"></script>
+        <script src="https://preview.babylonjs.com/materialsLibrary/babylonjs.materials.min.js"></script>
+        <script src="https://preview.babylonjs.com/proceduralTexturesLibrary/babylonjs.proceduralTextures.min.js"></script>
+        <script src="https://preview.babylonjs.com/postProcessesLibrary/babylonjs.postProcess.min.js"></script>
+        <script src="https://preview.babylonjs.com/loaders/babylonjs.loaders.js"></script>
+        <script src="https://preview.babylonjs.com/serializers/babylonjs.serializers.min.js"></script>
+        <script src="https://preview.babylonjs.com/gui/babylon.gui.min.js"></script>
+    </head>
+
+   <body>
+
+    <canvas id="renderCanvas" touch-action="none"></canvas> <!-- touch-action="none" for best results from PEP -->
+
+    <script>
+	//loader Ring function -start
+	var Ring = function() {
+		this.center = null;
+		this.tubes = [];
+		this.angle = 0;
+		
+		this.addTube = function (points) {	
+			var tube = BABYLON.Mesh.CreateTube(
+				"tube",
+				points, 1, 3, null, BABYLON.Mesh.CAP_ALL, this.center.getScene(), false, BABYLON.Mesh.FRONTSIDE);
+			//tube.convertToFlatShadedMesh();
+			tube.parent = this.center;
+			this.tubes.push(tube);
+		}
+	};
+
+	var getPointsInRange = function (nb, width, range) {
+		var points = [];	
+		var alpha = 0;
+		
+		for (var i = 0; i < nb; i++) {		
+			if (alpha >= range.min && alpha <= range.max) {
+		// use -20 to see lower than eye.
+		points.push(new BABYLON.Vector3(width * Math.cos(alpha),-20,width *Math.sin(alpha)));					
+			}
+			alpha += Math.PI*2 / nb;
+		}
+		return points;
+	};
+
+	//loader Ring function -end
+        var canvas = document.getElementById("renderCanvas"); // Get the canvas element
+        var engine = new BABYLON.Engine(canvas, true); // Generate the BABYLON 3D engine
+
+        /******* Add the create scene function ******/
+        var createScene = function () {
+
+            // Create the scene space
+            var scene = new BABYLON.Scene(engine);
+	    
+ 	    // Add a camera to the scene and attach it to the canvas
+            var camera = new BABYLON.ArcRotateCamera("Camera", -Math.PI / 2,  Math.PI / 2, 80, BABYLON.Vector3.Zero(), scene);
+	    camera.attachControl(canvas, true);
+	    camera.inputs.attached.mousewheel.detachControl(canvas);
+
+	// Create a  loader ring 
+		var createRing = function (nb, width, ranges) {
+			var ring = new Ring();
+			ring.center = BABYLON.Mesh.CreateBox("center", 1, scene);
+							
+			for (var r = 0; r < ranges.length; r++) {
+				ring.addTube(getPointsInRange(nb, width, ranges[r]));
+			}
+			return ring;
+		}
+		
+		var nbRings = 10;
+		var w = 5;
+		var angle = 0.005;
+		
+		var materials = [];
+		
+		var mat1 = new BABYLON.StandardMaterial("", scene);
+		mat1.diffuseColor = BABYLON.Color3.White();
+		
+		
+		var mat2 = new BABYLON.StandardMaterial("", scene);
+		mat2.diffuseColor = BABYLON.Color3.Black();	
+		mat2.specularColor = BABYLON.Color3.Black();
+		materials.push(mat1, mat2);
+		
+		var rings = [];
+		for (var c = 1; c <= nbRings; c++) {
+			var ring = createRing(30*c, w+1.5*c, [
+				{ min: Math.PI / 4, max: 3 * Math.PI / 4 },
+				{ min: 5*Math.PI / 4, max: 7 * Math.PI / 4 }
+			]);
+			ring.angle = angle * c;
+			ring.tubes.forEach(function (t) {
+				t.material = materials[c % 2];
+			});
+			
+			rings.push(ring);		
+		}
+		scene.registerBeforeRender(function () {
+			rings.forEach(function (ring) {
+				ring.center.rotation.y += ring.angle;
+			});
+		});
+		// Create a ring -end	
+	    
+		var imageDownloadCount=8;
+ 	    
+	    var light = new BABYLON.HemisphericLight("light1", new BABYLON.Vector3(0, 1, 0), scene);  
+		
+		var tex1= "./DentalClinic360/reception.jpg";
+		var texture1 = new BABYLON.Texture(tex1, engine, false, false);
+		texture1.onLoadObservable.add(() => {
+		console.log("reception loadded");
+		imageDownloadCount --;
+		});
+		var tex2= "./DentalClinic360/DocConsultation.jpg";
+		var texture2 = new BABYLON.Texture(tex2, engine, false, false);
+		texture2.onLoadObservable.add(() => {
+		console.log("DocConsultation loadded");
+		imageDownloadCount --;
+		});
+		var tex3= "./DentalClinic360/Radiology.jpg";
+		var texture3 = new BABYLON.Texture(tex3, engine, false, false);
+		texture3.onLoadObservable.add(() => {
+		console.log("Radiology loadded");
+		imageDownloadCount --;
+		});
+		var tex4= "./DentalClinic360/bloodcollection.jpg";
+		var texture4 = new BABYLON.Texture(tex4, engine, false, false);
+		texture4.onLoadObservable.add(() => {
+		console.log("bloodcollection loadded");
+		imageDownloadCount --;
+		});
+		var tex5= "./DentalClinic360/pathologicalLab.jpg";
+		var texture5= new BABYLON.Texture(tex5, engine, false, false);
+		texture5.onLoadObservable.add(() => {
+		console.log("pathologicalLab loadded");
+		imageDownloadCount --;
+		});
+		var tex6= "./DentalClinic360/OperationRoom1.jpg";
+		var texture6 = new BABYLON.Texture(tex6, engine, false, false);
+		texture6.onLoadObservable.add(() => {
+		console.log("OperationRoom1 loadded");
+		imageDownloadCount --;
+		});
+		var tex7= "./DentalClinic360/OperationRoom2.jpg";
+		var texture7 = new BABYLON.Texture(tex7, scene, false, false);
+		texture7.onLoadObservable.add(() => {
+		console.log("OperationRoom2 loadded");
+		imageDownloadCount --;
+		});
+		var tex8= "./DentalClinic360/OperationRoom3.jpg";
+		var texture8 = new BABYLON.Texture(tex8, scene, false, false);
+		texture8.onLoadObservable.add(() => {
+		console.log("OperationRoom3 loadded");
+		imageDownloadCount --;
+		if(imageDownloadCount<1){		
+			// on completion of load, loader disapear
+		   	rings.forEach(function (ring) {
+				ring.center.dispose();
+				ring.tubes.forEach(function (t) {
+				t.dispose();
+				});				
+			    });
+		}
+		});
+		var tex9= "./DentalClinic360/RestRoom.jpg";
+		var texture9 = new BABYLON.Texture(tex9, scene, false, false);
+		texture9.onLoadObservable.add(() => {
+		console.log("restroom loadded");
+		imageDownloadCount --;	
+		console.log(imageDownloadCount);
+		if(imageDownloadCount<1){		
+			// on completion of load, loader disapear
+		   	rings.forEach(function (ring) {
+				ring.center.dispose();
+				ring.tubes.forEach(function (t) {
+				t.dispose();
+				});				
+			    });
+		}
+		});
+	
+	
+		   
+	       //add a 360 photo	 
+	       var dome = new BABYLON.PhotoDome(
+			"testdome",
+			"./DentalClinic360/reception.jpg",
+			{
+			    resolution: 32,
+			    size: 1000
+			   //,useDirectMapping: false
+			},
+			scene
+		    );
+
+    		dome.imageMode = BABYLON.PhotoDome.MODE_MONOSCOPIC;		
+		dome.onReady = () =>{
+ 		// Our built-in 'sphere' shape. Params: name, subdivs, size, scene
+    	   	var sphere = BABYLON.Mesh.CreateSphere("sphere", 16, 2, scene);
+
+    	   	// Move the sphere 
+    	   	   sphere.position.z = 100;
+	   	   sphere.position.y = -15;
+	   	   sphere.position.x = 50;	
+		   sphere.name="Comfortable couch";
+		   var label = createLabel(sphere);	   	    
+		
+		  
+		// Create the 3D UI manager
+		var manager = new BABYLON.GUI.GUI3DManager(scene);
+		var anchor = new BABYLON.AbstractMesh("anchor", scene);
+		setTimeout(() => {
+		    // Let's add a button
+		    var button = new BABYLON.GUI.HolographicButton("down");
+		    manager.addControl(button);
+		    button.linkToTransformNode(anchor);
+		    button.position.z = -20.5;
+ 		    //button.imageUrl = "./image/whatnext.jpg";
+		    var text1 = new BABYLON.GUI.TextBlock();
+		    text1.color = "White";
+		    text1.text = "Consultation Room";
+		    button.content = text1;	
+
+		    button.onPointerUpObservable.add(function(){
+			//console.log(button.content.text);
+			if(button.content.text==="Consultation Room"){
+			advancedTexture.removeControl(label);
+			var text2= new BABYLON.GUI.TextBlock();
+			text2.text = "Radiology Room";
+			text2.color = "White";
+			button.content = text2;			
+			dome.photoTexture =texture2;
+			sphere.position.y = 10;
+	   		sphere.position.x = 50;
+			sphere.position.z = 100;
+			sphere.name="Technical Chair";
+			label= createLabel(sphere);		
+			}
+			else if(button.content.text === "Radiology Room"){
+			advancedTexture.removeControl(label);						
+			dome.photoTexture =texture3;
+			var text3 = new BABYLON.GUI.TextBlock();
+			text3.color = "White";
+			text3.text = "Pathology Lab";
+			button.content = text3;
+			sphere.name="XRAY ";
+		   	label= createLabel(sphere);
+			}
+			else if(button.content.text === "Pathology Lab"){
+			sphere.dispose();
+			advancedTexture.removeControl(label);			
+			dome.photoTexture =texture4;
+			var text4 = new BABYLON.GUI.TextBlock();
+			text4.color = "White";
+			text4.text = "MicroBiology Lab";
+			button.content = text4;			
+			}
+			else if(button.content.text === "MicroBiology Lab"){			
+			dome.photoTexture =texture5;
+			var text5 = new BABYLON.GUI.TextBlock();
+			text5.text = "Operation Room 1";
+			text5.color = "White";
+			button.content = text5;
+			}
+			else if(button.content.text === "Operation Room 1"){			
+			dome.photoTexture =texture6;
+			var text6 = new BABYLON.GUI.TextBlock();
+			text6.text = "Operation Room 2";
+			text6.color = "White";
+			button.content = text6;
+			}
+			else if(button.content.text === "Operation Room 2"){			
+			dome.photoTexture =texture7;
+			var text7 = new BABYLON.GUI.TextBlock();
+			text7.text = "Operation Room 3";
+			text7.color = "White";
+			button.content = text7;
+			}
+			else if(button.content.text === "Operation Room 3"){			
+			dome.photoTexture =texture8
+			var text8 = new BABYLON.GUI.TextBlock();
+			text8.text = "Rest Room";
+			text8.color = "White";
+			button.content = text8;
+			}
+			else if(button.content.text === "Rest Room"){			
+			dome.photoTexture =texture9;
+			var text9 = new BABYLON.GUI.TextBlock();
+			text9.text = "Reception";
+			text9.color = "White";
+			button.content = text9;
+			}
+			else if(button.content.text === "Reception"){
+			// Our built-in 'sphere' shape. Params: name, subdivs, size, scene
+    	   		sphere = BABYLON.Mesh.CreateSphere("sphere", 16, 2, scene);
+
+	    	   	// Move the sphere 
+	    	   	   sphere.position.z = 100;
+		   	   sphere.position.y = -15;
+		   	   sphere.position.x = 50;	
+		   	sphere.name="Comfortable couch";
+		   	label= createLabel(sphere);			
+			dome.photoTexture =texture1;
+			var text1 = new BABYLON.GUI.TextBlock();
+			text1.text = "Consultation Room";
+			text1.color = "blue";
+			button.content = text1;
+			}
+
+		    });
+		  },40000) //timeout
+		}// on dome ready
+		var advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
+		var setView = function(but) {
+		console.log(but);
+			if(but === 0){console.log("360 view");
+				camera.lowerBetaLimit = 0;
+				camera.upperBetaLimit = 3.14159;
+			}
+			else{
+ 				camera.lowerBetaLimit = 0.698132; // 40 degrees
+    	    			camera.upperBetaLimit = 1.5777;   // 90 degrees
+			}
+		}
+
+		//Add View Selection Panel 
+		var viewGroup = new BABYLON.GUI.RadioGroup("View");
+		viewGroup.addRadio("360 View", setView, true);
+	    	viewGroup.addRadio("Panorama", setView);
+
+		//var rotateGroup = new BABYLON.GUI.SliderGroup("Zoom", "S");
+		//rotateGroup.addSlider("Zoom", orientateY, "degs", camera.lowerRadiusLimit, 2 * Math.PI, 0, displayValue)
+
+		var selectBox = new BABYLON.GUI.SelectionPanel("sp", [viewGroup]);
+	    	selectBox.width = 0.10;
+	    	selectBox.height = 0.20;
+	    	selectBox.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+	    	selectBox.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_BOTTOM;
+	     
+	    	advancedTexture.addControl(selectBox);
+
+		/*var toSize = function(isChecked) {}		
+		var toPlace = function(isChecked) {}
+		var setColor = function(but) {}
+		var orientateY = function(angle) {}
+		var orientateX = function(angle) {}
+		var displayValue = function(value) {0}
+
+	    	var transformGroup = new BABYLON.GUI.CheckboxGroup("Transformation");
+		transformGroup.addCheckbox("Small", toSize);
+	    	transformGroup.addCheckbox("High", toPlace);
+		
+		var colorGroup = new BABYLON.GUI.RadioGroup("View");
+		colorGroup.addRadio("360 View", setColor, true);
+	    	colorGroup.addRadio("Panorama", setColor);
+		
+		var rotateGroup = new BABYLON.GUI.SliderGroup("Rotation", "S");
+		rotateGroup.addSlider("Angle Y", orientateY, "degs", 0, 2 * Math.PI, 0, displayValue)
+		rotateGroup.addSlider("Angle X", orientateX, "degs", 0, 2 * Math.PI, Math.PI, displayValue)
+	    	var selectBox = new BABYLON.GUI.SelectionPanel("sp", [transformGroup, colorGroup, rotateGroup]);
+	    	selectBox.width = 0.25;
+	    	selectBox.height = 0.56;
+	    	selectBox.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+	    	selectBox.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_BOTTOM;
+	     
+	    	advancedTexture.addControl(selectBox);
+		*/  
+		
+
+ 		 var createLabel = function(mesh) {
+			var label = new BABYLON.GUI.Rectangle("label for " + mesh.name);
+			label.background = "black"
+			label.height = "30px";
+			label.alpha = 0.5;
+			label.width = "300px";
+			label.cornerRadius = 20;
+			label.thickness = 1;
+			label.linkOffsetY = 30;
+			advancedTexture.addControl(label); 
+			label.linkWithMesh(mesh);
+
+			var text1 = new BABYLON.GUI.TextBlock();
+			text1.text = mesh.name;
+			text1.color = "white";
+			label.addControl(text1);
+			return label;
+		    }
+
+		// Plus- and minus- key zooming
+    		var map = {};
+		camera.lowerRadiusLimit = 20;
+    		camera.upperRadiusLimit = 80; 
+ 		scene.actionManager = new BABYLON.ActionManager(scene);
+		scene.actionManager.registerAction(new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnKeyDownTrigger, function(evt){
+			map[evt.sourceEvent.key] = evt.sourceEvent.type == "keydown";
+			var key = evt.sourceEvent.key;
+			if(key === "-" || key === "_"){
+			    camera.radius += 5;
+			}
+			if(key === "+" || key === "="){
+			    camera.radius -= 5;
+			}
+		    }));
+
+		    
+
+            return scene;
+        };
+        /******* End of the create scene function ******/
+
+        var scene = createScene(); //Call the createScene function
+
+        // Register a render loop to repeatedly render the scene
+        engine.runRenderLoop(function () {
+                scene.render();
+        });
+
+        // Watch for browser/canvas resize events
+        window.addEventListener("resize", function () {
+                engine.resize();
+        });
+
+	
+    </script>
+
+   </body>
+
+</html>
+
